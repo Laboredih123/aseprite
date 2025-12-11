@@ -936,6 +936,10 @@ void Widget::getDrawableRegion(gfx::Region& region, DrawableRegionFlags flags)
     if (p) {
       region &= Region(p->bounds());
     }
+    // Intersect with window bounds
+    if (this->window()) {
+      region &= Region(this->window()->bounds());
+    }
   }
 
   // Limit to the displayable area
@@ -965,6 +969,9 @@ int Widget::textWidth() const
 
 int Widget::textHeight() const
 {
+  if (auto blob = textBlob())
+    return blob->textHeight();
+
   text::FontMetrics metrics;
   font()->metrics(&metrics);
   return metrics.descent - metrics.ascent;
@@ -1384,7 +1391,8 @@ GraphicsPtr Widget::getGraphics(const gfx::Rect& clip)
   // In case of double-buffering, we need to create the temporary
   // buffer only if the default surface is the screen.
   if (isDoubleBuffered() && dstSurface->isDirectToScreen()) {
-    os::SurfaceRef surface = os::System::instance()->makeSurface(clip.w, clip.h);
+    os::SurfaceRef surface =
+      os::System::instance()->makeSurface(clip.w, clip.h, dstSurface->colorSpace());
     graphics.reset(new Graphics(display, surface, -clip.x, -clip.y),
                    DeleteGraphicsAndSurface(clip, surface, dstSurface));
   }
@@ -1590,6 +1598,10 @@ void Widget::processMnemonicFromText(const int escapeChar, const bool requireMod
       chr = decode.next();
       if (!chr) {
         break; // Ill-formed string (it ends with escape character)
+      }
+      if (std::isspace(chr)) {
+        // Avoid mnemonics for space characters.
+        newText.push_back(escapeChar);
       }
       else if (chr != escapeChar) {
         setMnemonic(chr, requireModifiers);
@@ -1896,14 +1908,16 @@ text::ShaperFeatures Widget::onGetTextShaperFeatures() const
 
 float Widget::onGetTextBaseline() const
 {
-  text::FontMetrics metrics;
-  font()->metrics(&metrics);
-  // Here we only use the descent+ascent to measure the text height,
-  // without the metrics.leading part (which is the used to separate
-  // text lines in a paragraph, but here'd make widgets too big)
-  const float textHeight = metrics.descent - metrics.ascent;
+  // Here we use TextBlob::textHeight() which is calculated as
+  // descent+ascent to measure the text height, without the
+  // metrics.leading part (which is the used to separate text lines in
+  // a paragraph, but here'd make widgets too big).
+  text::TextBlobRef blob = textBlob();
+  if (!blob)
+    return 0.0f;
+
   const gfx::Rect rc = clientChildrenBounds();
-  return guiscaled_center(rc.y, rc.h, textHeight) - metrics.ascent;
+  return guiscaled_center(rc.y, rc.h, blob->textHeight()) + blob->baseline();
 }
 
 void Widget::onDragEnter(DragEvent& e)

@@ -12,6 +12,7 @@
 #include "app/commands/command.h"
 #include "app/context_access.h"
 #include "app/doc_api.h"
+#include "app/i18n/strings.h"
 #include "app/modules/gui.h"
 #include "app/tx.h"
 #include "doc/layer.h"
@@ -42,10 +43,10 @@ void DuplicateLayerCommand::onExecute(Context* context)
   Doc* document = writer.document();
 
   {
-    Tx tx(writer, "Layer Duplication");
+    Tx tx(writer, Strings::commands_DuplicateLayer());
     LayerImage* sourceLayer = static_cast<LayerImage*>(writer.layer());
     DocApi api = document->getApi(tx);
-    api.duplicateLayerAfter(sourceLayer, sourceLayer->parent(), sourceLayer, " Copy");
+    api.duplicateLayerAfter(sourceLayer, sourceLayer->parent(), sourceLayer);
     tx.commit();
   }
 

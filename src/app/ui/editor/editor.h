@@ -323,6 +323,8 @@ public:
   void deleteSelectionToolMask();
   bool hasSelectionToolMask();
 
+  const TiledModeHelper& getTiledModeHelper() const { return m_tiledModeHelper; }
+
   static void registerCommands();
 
 protected:
@@ -351,6 +353,7 @@ protected:
   void onBeforeLayerEditableChange(DocEvent& ev, bool newState) override;
   void onBeforeSlicesDuplication(DocEvent& ev) override;
   void onSliceDuplicated(DocEvent& ev) override;
+  void onBeforeCommitTransaction(DocEvent& ev) override;
 
   // ActiveToolObserver impl
   void onActiveToolChange(tools::Tool* tool) override;
@@ -359,7 +362,7 @@ private:
   enum class Flashing { None, WithFlashExtraCel, WaitingDeferedPaint };
 
   void setStateInternal(const EditorStatePtr& newState);
-  void updateQuicktool();
+  void updateQuicktool(const ui::Message* msg);
   void updateToolByTipProximity(ui::PointerType pointerType);
 
   // firstFromMouseDown=true when we call this function from the

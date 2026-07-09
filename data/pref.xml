@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Aseprite -->
-<!-- Copyright (C) 2018-2025  Igara Studio S.A. -->
+<!-- Copyright (C) 2018-present  Igara Studio S.A. -->
 <!-- Copyright (C) 2014-2018  David Capello -->
 <preferences>
 
@@ -259,9 +259,13 @@
       <option id="use_selection_tool_loop" type="bool" default="false" />
       <option id="nonactive_layers_opacity" type="int" default="255" />
       <option id="nonactive_layers_opacity_preview" type="int" default="255" />
+      <option id="tooltip_delay" type="int" default="300" />
     </section>
     <section id="news">
       <option id="cache_file" type="std::string" />
+    </section>
+    <section id="context_bar">
+      <option id="show_corner_radius" type="bool" default="false" />
     </section>
     <section id="status_bar">
       <option id="focus_frame_field_on_mouseover" type="bool" default="false" />
@@ -379,6 +383,7 @@
     <section id="slices">
       <option id="default_color" type="app::Color" default="app::Color::fromRgb(0, 0, 255)" />
       <option id="user_data_visibility" type="bool" default="false" />
+      <option id="use_keys" type="bool" default="false" />
     </section>
     <section id="advanced_mode">
       <option id="show_alert" type="bool" default="true" />
@@ -481,6 +486,7 @@
     <option id="filled_preview" type="bool" default="false" />
     <option id="ink" type="app::tools::InkType" default="app::tools::InkType::DEFAULT" />
     <option id="freehand_algorithm" type="app::tools::FreehandAlgorithm" default="app::tools::FreehandAlgorithm::DEFAULT" />
+    <option id="corner_radius" type="int" default="0" />
     <!-- Update app::Preferences::resetToolPreferences() function if you add new sections here  -->
     <section id="brush">
       <option id="type" type="BrushType" default="BrushType::CIRCLE" />
@@ -600,6 +606,7 @@
       <option id="extrude" type="bool" default="false" />
       <option id="merge_duplicates" type="bool" default="false" />
       <option id="ignore_empty" type="bool" default="false" />
+      <option id="power_of_two_size" type="bool" default="false" />
       <option id="open_generated" type="bool" default="false" />
       <option id="layer" type="std::string" />
       <option id="layer_index" type="int" default ="-1" />

@@ -1323,19 +1323,26 @@ Theme::TextColors SkinTheme::getTextColors(Widget* widget)
   c.background = Paint(colors.textboxFace());
   c.selectedText = Paint(colors.selectedText());
   c.selectedBackground = Paint(colors.selected());
+  c.disabledBackground = Paint(colors.face());
+  c.disabledText = Paint(colors.disabled());
+  c.placeholderText = Paint(colors.entrySuffix());
 
   // Try to get colors from the widget style
   if (ui::Style* style = widget->style()) {
     for (auto& layer : style->layers()) {
       switch (layer.type()) {
         case ui::Style::Layer::Type::kBackground:
-          if (layer.flags() & ui::Style::Layer::kSelected)
+          if (layer.flags() & ui::Style::Layer::kDisabled)
+            c.disabledBackground.color(layer.color());
+          else if (layer.flags() & ui::Style::Layer::kSelected)
             c.selectedBackground.color(layer.color());
           else
             c.background.color(layer.color());
           break;
         case ui::Style::Layer::Type::kText:
-          if (layer.flags() & ui::Style::Layer::kSelected)
+          if (layer.flags() & ui::Style::Layer::kDisabled)
+            c.disabledText.color(layer.color());
+          else if (layer.flags() & ui::Style::Layer::kSelected)
             c.selectedText.color(layer.color());
           else
             c.text.color(layer.color());
@@ -1402,36 +1409,17 @@ public:
   bool caretDrawn() const { return m_caretDrawn; }
   const gfx::Rect& textBounds() const { return m_textBounds; }
 
-  bool isSelectedChar(const int index) override
-  {
-    return ((index >= m_range.from) && (index < m_range.to));
-  }
-
-  void drawSelectionBg(const gfx::RectF& bounds) override
-  {
-    auto* theme = SkinTheme::get(m_widget);
-    auto& colors = theme->colors;
-    gfx::Color bg = ColorNone;
-
-    if (m_widget->hasFocus())
-      bg = colors.selected();
-    else
-      bg = colors.disabled();
-
-    if (bg != ColorNone)
-      m_graphics->fillRect(bg, gfx::Rect(bounds.x - m_widget->bounds().x, m_y, bounds.w, m_h));
-  }
-
   void preProcessChar(const int index,
                       const base::codepoint_t codepoint,
                       gfx::Color& fg,
                       gfx::Color& bg,
                       const gfx::Rect& charBounds) override
   {
-    auto* theme = SkinTheme::get(m_widget);
+    auto theme = SkinTheme::get(m_widget);
 
     // Normal text
     auto& colors = theme->colors;
+    bg = ColorNone;
     fg = colors.text();
 
     // Suffix text
@@ -1440,14 +1428,21 @@ public:
     }
 
     // Selected
-    if (isSelectedChar(m_index)) {
+    if ((m_index >= m_range.from) && (m_index < m_range.to)) {
+      if (m_widget->hasFocus())
+        bg = colors.selected();
+      else
+        bg = colors.disabled();
       fg = colors.selectedText();
     }
 
     // Disabled
     if (!m_widget->isEnabled()) {
+      bg = ColorNone;
       fg = colors.disabled();
     }
+
+    m_bg = bg;
   }
 
   bool preDrawChar(const gfx::Rect& charBounds) override
@@ -1456,6 +1451,13 @@ public:
     m_charStartX = charBounds.x;
 
     if (charBounds.x2() - m_widget->bounds().x < m_widget->clientBounds().x2()) {
+      if (m_bg != ColorNone) {
+        // Fill the background here, accounts for regions with TTF fonts where the char is smaller
+        // than the text bounds [m_y,m_y+m_h)
+        m_graphics->fillRect(
+          m_bg,
+          gfx::Rect(m_lastX - m_widget->bounds().x, m_y, charBounds.x2() - m_lastX, m_h));
+      }
       m_lastX = charBounds.x2();
       return true;
     }
@@ -1484,6 +1486,7 @@ private:
   Entry::Range m_range;
   gfx::Rect m_textBounds;
   bool m_caretDrawn;
+  gfx::Color m_bg;
   int m_lastX; // Last position used to fill the background
   int m_y, m_h;
   int m_charStartX;
@@ -1503,8 +1506,9 @@ void SkinTheme::drawEntryText(ui::Graphics* g, ui::Entry* widget)
   const std::string& fullText = widget->text() + widget->getSuffix();
 
   // Full text to paint: widget text + suffix or placeholder
-  const std::string& paintText = fullText.empty() ? widget->placeholder() : fullText;
-
+  const std::string& paintText = (fullText.empty() && !widget->isReadOnly()) ?
+                                   widget->placeholder() :
+                                   fullText;
   if (!paintText.empty()) {
     base::utf8_decode dec(paintText);
     auto pos = dec.pos();
@@ -1524,7 +1528,7 @@ void SkinTheme::drawEntryText(ui::Graphics* g, ui::Entry* widget)
       }
 
       g->drawTextWithDelegate(std::string(pos, paintText.end()), // TODO use a string_view()
-                              fullText.empty() ? colors.disabled() : colors.text(),
+                              fullText.empty() ? colors.entrySuffix() : colors.text(),
                               ColorNone,
                               gfx::Point(bounds.x, baselineAdjustment),
                               &delegate);

@@ -101,6 +101,7 @@ public:
 
   const DocUndo* undoHistory() const { return m_undo.get(); }
   DocUndo* undoHistory() { return m_undo.get(); }
+  void resetUndoHistory();
 
   bool isUndoing() const;
 
@@ -144,6 +145,7 @@ public:
   void notifyAfterAddTile(LayerTilemap* layer, frame_t frame, tile_index ti);
   void notifyBeforeSlicesDuplication();
   void notifySliceDuplicated(Slice* slice);
+  void notifyBeforeCommitTransaction();
 
   //////////////////////////////////////////////////////////////////////
   // File related properties

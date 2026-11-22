@@ -11,7 +11,6 @@
 
 #include "app/app.h"
 #include "app/color.h"
-#include "app/color_utils.h"
 #include "app/context.h"
 #include "app/doc.h"
 #include "app/file_selector.h"
@@ -21,7 +20,6 @@
 #include "app/script/keys.h"
 #include "app/script/luacpp.h"
 #include "app/script/tabs_widget.h"
-#include "app/ui/button_set.h"
 #include "app/ui/color_button.h"
 #include "app/ui/color_shades.h"
 #include "app/ui/editor/editor.h"
@@ -32,7 +30,6 @@
 #include "base/fs.h"
 #include "base/paths.h"
 #include "base/remove_from_container.h"
-#include "os/screen.h"
 #include "os/system.h"
 #include "ui/app_state.h"
 #include "ui/box.h"
@@ -52,6 +49,8 @@
 #include "ui/slider.h"
 #include "ui/system.h"
 #include "ui/view.h"
+
+#include "fmt/format.h"
 
 #include <map>
 #include <stack>
@@ -128,6 +127,8 @@ struct Dialog {
   // Pointer to current grid (might be the main grid or a tab's grid).
   ui::Grid* currentGrid;
   ui::HBox* hbox = nullptr;
+  bool sameRow = false;
+  bool autoSameRow = false;
   bool autoNewRow = false;
   WidgetsList mainWidgets;
   std::map<std::string, ui::Widget*, std::less<>> dataWidgets;
@@ -603,11 +604,16 @@ int Dialog_add_widget(lua_State* L, Widget* widget)
 
   // This is to separate different kind of widgets without label in
   // different rows. Separator widgets will always create a new row.
-  if (dlg->lastWidgetType != widget->type() || dlg->autoNewRow ||
-      widget->type() == ui::kSeparatorWidget) {
+  if (dlg->sameRow && widget->type() != ui::kSeparatorWidget &&
+      dlg->lastWidgetType != ui::kSeparatorWidget) {
+    dlg->lastWidgetType = widget->type();
+  }
+  else if (dlg->lastWidgetType != widget->type() || dlg->autoNewRow ||
+           widget->type() == ui::kSeparatorWidget) {
     dlg->lastWidgetType = widget->type();
     dlg->hbox = nullptr;
   }
+  dlg->sameRow = dlg->autoSameRow;
 
   if (lua_istable(L, 2)) {
     // Widget ID (used to fill the Dialog_get_data table then)
@@ -710,8 +716,28 @@ int Dialog_newrow(lua_State* L)
   dlg->autoNewRow = false;
   if (lua_istable(L, 2)) {
     // Dialog:newrow{ always }
-    if (lua_is_key_true(L, 2, "always"))
+    if (lua_is_key_true(L, 2, "always")) {
       dlg->autoNewRow = true;
+      // autoSameRow has priority when adding widget, uncheck it
+      dlg->autoSameRow = false;
+    }
+    lua_pop(L, 1);
+  }
+
+  lua_pushvalue(L, 1);
+  return 1;
+}
+
+int Dialog_samerow(lua_State* L)
+{
+  auto dlg = get_obj<Dialog>(L, 1);
+
+  dlg->sameRow = true;
+  dlg->autoSameRow = false;
+  if (lua_istable(L, 2)) {
+    // Dialog:samerow{ always }
+    if (lua_is_key_true(L, 2, "always"))
+      dlg->autoSameRow = true;
     lua_pop(L, 1);
   }
 
@@ -1695,6 +1721,7 @@ int Dialog_modify(lua_State* L)
     // to modify dialog's properties (which might generate a relayout)
     // during an ongoing resize event.
     if (relayout && !dlg->window.isResizing()) {
+      gfx::Rect prelayoutBounds = dlg->window.bounds();
       dlg->window.layout();
 
       if (dlg->autofit > 0) {
@@ -1763,6 +1790,10 @@ int Dialog_modify(lua_State* L)
                      }
                    });
       }
+
+      dlg->window.invalidate();
+      if (dlg->window.manager()->display())
+        dlg->window.manager()->display()->invalidateRect(prelayoutBounds);
     }
   }
   lua_pushvalue(L, 1);
@@ -1900,7 +1931,7 @@ int Dialog_set_data(lua_State* L)
           if (expr->decimals() == 0)
             expr->setTextf("%d", lua_tointeger(L, -1));
           else
-            expr->setTextf("%.*g", expr->decimals(), lua_tonumber(L, -1));
+            expr->setText(fmt::format("{:.{}f}", lua_tonumber(L, -1), expr->decimals()));
         }
         else if (auto p = lua_tostring(L, -1)) {
           widget->setText(p);
@@ -2029,6 +2060,7 @@ const luaL_Reg Dialog_methods[] = {
   { "showMenu",  Dialog_showMenu  },
   { "close",     Dialog_close     },
   { "newrow",    Dialog_newrow    },
+  { "samerow",   Dialog_samerow   },
   { "separator", Dialog_separator },
   { "label",     Dialog_label     },
   { "button",    Dialog_button    },
